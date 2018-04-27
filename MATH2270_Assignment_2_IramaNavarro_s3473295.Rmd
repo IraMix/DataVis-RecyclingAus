@@ -1,0 +1,189 @@
+---
+title: "MATH2270 Assignment 2"
+subtitle: Visualising Open Data
+header-includes:
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+output:
+  
+  pdf_document: 
+    fig_height: 6
+    fig_width: 8.5
+  html_notebook: default
+
+---
+
+## Student Details
+
+* Irama Navarro (s3473295)
+
+## Introduction
+
+The following Visualisation gets the data from the Department of Environment and Energy. Its main goal is to paint the picture as to how Australians Waste and Recycle per Capita, per Kilo, per person and to incentivate you to think about your personal waste and recycling behaviour.
+
+Data can be found in the following link.
+
+http://www.environment.gov.au/protection/national-waste-policy/publications/waste-and-recycling-australia-2011
+
+```{r, tidy=TRUE, warning=FALSE}
+# Load packages
+library(dplyr) # With dplyr calculate a column for the median
+library(ggplot2)
+library(readxl)
+library(oz) #Autralian Map
+library(ggpubr)
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lattice)
+library(ggrepel) # new labels ggplot
+```
+
+## Data
+The following code loads and sets the data to prepare for the visualtisation.
+
+```{r, tidy=TRUE, warning=FALSE}
+# Load data and prepare for visualisation
+
+# Read converted Oz data. 
+oz2 <- read.csv("http://www.remkoduursma.com/docs/ozdata.csv")
+
+oz_states <- data.frame(state=c("NSW", "NT","QLD", "SA",  "TAS", "VIC", "WA"),
+                        Region=c("New South Wales","Northern Territory",
+                            "Queensland","South Australia",
+                                 "Tasmania","Victoria","Western Australia"))
+
+# Merge oz2 with the states, and population data.
+waste <- read_excel("dataAssignment2.xlsx", sheet = 1)
+
+oz2 <- left_join(oz2, oz_states) 
+
+waste$Region <- as.factor(waste$Region)
+
+oz2 <- left_join(oz2, waste)
+?left_join
+## Read materials Recycled
+mat <- read_excel("dataAssignment2.xlsx", sheet = 4)
+
+class(mat$KgPerPerson)
+
+mat <- read.csv("dataAssignment2.csv")
+
+mat$MateriaCategory <- as.factor(mat$MateriaCategory)
+levels(mat$MateriaCategory)
+```
+
+
+## Visualisation: Australian Heat Map Recycling Rate
+
+```{r, tidy=TRUE, warning=FALSE}
+
+# Visualise the Data
+
+p <- ggplot(oz2) + 
+  geom_polygon(aes(x = long, y = lat, group = group, fill = RecyclingRate), 
+               size = .2, color = 'black', alpha = 0.8) +
+  coord_map() +
+  scale_fill_gradient(name="Rate", 
+                      low = "orange", high = "Blue2", limits=c(0.04,0.75)) + 
+  labs(title="Recycling Rate (Proportion of Waste Recycled)",
+       y = "Lattitude", x="Longitude" ) +
+  theme(legend.position = "right") +
+  annotate("text", x = 121, y = -26,
+           label = ".31", parse = TRUE, color="white", size=3) +
+  annotate("text", x = 133.5, y = -20,
+           label = ".04", parse = TRUE, color="white", size=3) +
+  annotate("text", x = 133.5, y = -29,
+           label = ".67", parse = TRUE, color="white", size=3)+
+  annotate("text", x = 144, y = -22,
+           label = ".45", parse = TRUE, color="white", size=3)+
+  annotate("text", x = 145, y = -32,
+           label = ".59", parse = TRUE, color="white", size=3)+
+  annotate("text", x = 143.5, y = -37,
+           label = ".54", parse = TRUE, color="white", size=3)+
+  annotate("text", x = 146.2, y = -42,
+           label = ".15", parse = TRUE, color="white", size=3)+
+  annotate("text", x = 151, y = -39.5,
+           label = "ACT:0.75", parse = TRUE, color="blue", size=3,fontface ="bold" )
+  
+p
+
+```
+
+##### Scatter Plot Recycling Vs Waste
+```{r, fig.width=10, fig.height=7, warning=FALSE}
+
+p1 <- ggplot(data = waste,aes(x = WasteGeneration, y = Recycling, colour = Region, size=Pop))
+p1 <- p1 + geom_point() + 
+  labs(title="Waste Vs Recycling per State",
+       y = "Recycling (kg per Capita)", x="Waste (kg per Capita)" ) +
+  theme(legend.position = "right") +
+  scale_x_continuous(limits = c(0, 3000)) +
+  scale_size_continuous(name="Population (Millions)") +
+  geom_vline(xintercept = mean(waste$WasteGeneration), linetype="dotted", color = "black", size=1) +
+  geom_hline(yintercept = mean(waste$Recycling), linetype="dotted", color = "black", size=1) +
+  annotate("text", x = 2200, y = 150,
+           label = "Average_Waste", parse = TRUE, color="black", size=3,fontface ="bold" ) +
+  annotate("text", x = 250, y = 950,
+           label = "Average_Recycling", parse = TRUE, color="black", size=3,fontface ="bold" ) +
+  geom_label_repel(aes(label=Region), size=3) +
+  guides(fill = guide_legend(label.position = "left", label.hjust = 1, keywidth = 3, keyheight = 1)) + 
+  geom_point(data = waste, aes( shape = NA), colour = "grey50")
+
+p1
+
+```
+
+##Recycling per Material Category per State
+
+```{r, warning=FALSE, tidy=TRUE}
+
+mat <- mat %>% group_by(MateriaCategory) %>%
+  mutate(mean = mean(KgPerPerson))
+
+
+p5 <- ggplot(mat, aes(x = Region, y = KgPerPerson, fill = Region, label=KgPerPerson))
+p5 <- p5 + geom_bar(stat = "identity", width = 0.8, position = "stack") + 
+  facet_grid(~MateriaCategory) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Recycling per Material Category and State",
+       y = "Kg per Capita", x="Region", caption="Source: http://www.environment.gov.au/protection/national-waste-policy/publications/waste-and-recycling-australia-2011") + 
+  geom_text(check_overlap = TRUE,  aes(label=KgPerPerson, y=KgPerPerson+ 23, colour = Region), size=2.5) +
+  scale_colour_discrete(l = 40)+
+  geom_hline(aes(yintercept = mean, group = MateriaCategory), colour = 'black', linetype="dotted") + 
+  geom_point(data = mat, aes(size="Mean per Material", shape = NA), colour = "black") + guides(size=guide_legend("Black Dotted line"))
+
+p5
+
+```
+
+
+
+\newpage
+\blandscape
+
+## Final Visualisation How Australians Waste and Recycle.
+```{r, fig.width=14, fig.height=10, warning=FALSE, tidy=TRUE}
+
+grid.arrange(
+  arrangeGrob(p, p1, ncol = 2),    # First row with one plot spaning over 2 columns
+             p5, # Second row with 2 plots in 2 different columns
+             nrow = 2, top=textGrob("How do Australians Waste and Recycle (Yearly Data 2011)", gp=gpar(fontsize=16,font=8))
+             ) 
+```
+\elandscape
+
+##Image Caption: 
+How Australians waste and recycle based on yearly data of 2011.
+ 
+The choropleth map of Australia is coloured  per Recycling rate, the darker the blue the best recycling rate. We see per region which state per capita has a highest recycling rate, which is the amount of kg of recycled materials versus those ones wasted. The South east part of Australia with exception of Tasmania has darker blue with higher recycling rates. On the contrary, a brighter yellow colour have the worst rate.
+ 
+On the right hand side of the map, the scatter plot help us to understand where each region make up their recycling rate. In particular viewing how many kilos per capita are wasted and recycled per year. The dotted lines are the National average for both waste and recycled kilos per year.
+ 
+In the scatter plot we can see Western Australia wastes the most and the least is Tasmania, although Tasmania also recycles the least. In the top right quadrant of the scatter plot the group of the best recyclers which are Australian Capital Territory, South Australia, NSW, and also seating above the national average Victoria. Higher recyclers, but also higher wasters.
+ 
+Lastly in the bar plot below we can see what are the materials categories most and least recycled per capita per region.
+ 
+At a first glance we can see the most recycled materials amongst all regions are Masonry materials followed by Organics. Materials such as plastic and glass have amongst all regions very low recycling kilos per capita.
+
