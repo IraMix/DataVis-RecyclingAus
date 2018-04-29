@@ -1,2 +1,2 @@
 # DataVis-RecyclingAus
-Exploring how Australians Recycle in ggplot. Vie R Markdown + ScreenCast
+Exploring how Australians Recycle in ggplot. View R Markdown + pdf result
